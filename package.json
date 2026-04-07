@@ -1,0 +1,25 @@
+{
+  "name": "template-switch",
+  "version": "1.0.0",
+  "description": "A switch that is fully configurable through HTML templates",
+  "main": "template-switch.js",
+  "scripts": {
+    "test": "true"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rodezee/template-switch.git"
+  },
+  "keywords": [
+    "switch",
+    "template",
+    "html",
+    "onepage"
+  ],
+  "author": "biensurerodezee@protonmail.com",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/rodezee/template-switch/issues"
+  },
+  "homepage": "https://github.com/rodezee/template-switch#readme"
+}
