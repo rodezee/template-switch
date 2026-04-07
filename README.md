@@ -1,7 +1,7 @@
 
 # ➤ Template Switch
 
-A tiny, zero-dependency, **Single Page Application (SPA)** router for the modern web. Inspired by `template-router`, but built for **instantaneous transitions** by pre-loading all routes and toggling their visibility.
+A tiny, zero-dependency, **Stateful SPA Router** for the modern web. Built for **instantaneous transitions** and **persistent state** by treating every unique URL as a living DOM instance.
 
 ----------
 
@@ -10,7 +10,7 @@ A tiny, zero-dependency, **Single Page Application (SPA)** router for the modern
 The fastest way to use **Template Switch** is via the [esm.sh](https://esm.sh) CDN.
 
 ```html
-<script type="module" src="https://esm.sh/gh/rodezee/template-switch"></script>
+<script type="module" src="https://esm.sh/gh/rodezee/template-switch/template-switch.js"></script>
 
 ```
 
@@ -18,22 +18,20 @@ The fastest way to use **Template Switch** is via the [esm.sh](https://esm.sh) C
 
 ## ✨ Key Features
 
--   **Zero Latency:** All routes are rendered once into the DOM. Switching "pages" is as fast as a CSS `display: block` change.
+-   **Zero Latency:** Routes are rendered into the DOM once and toggled via `display: block`. Switching is as fast as a CSS change.
     
--   **State Persistence:** Because DOM nodes aren't destroyed, scroll positions, form inputs, and JS variables stay exactly where you left them.
+-   **State Persistence:** Because DOM nodes aren't destroyed when you navigate away, scroll positions, form inputs, and JS variables stay exactly where you left them.
     
--   **Zero Dependencies:** No React, no Vue, no Build Tools. Just standard Web Components and `<template>` tags.
+-   **Built-in Transitions:** Smooth, hardcoded `fadeIn` animations for every page change—no extra CSS required.
     
--   **Auto-Layout:** Define a global wrapper once; inject content dynamically.
+-   **Dynamic "Instance" Routing:** Navigating to `/user/1` and `/user/2` creates two distinct, persistent sections.
     
--   **URL Params:** Supports dynamic routing (e.g., `/user/:id`) with automatic interpolation.
+-   **Zero Dependencies:** No React, no Vue, no build tools. Just standard Web Components.
     
 
 ----------
 
 ## 🛠️ Usage
-
-Wrap your application in the `<template-switch>` tag. Define your layout and your routes using nested `<template>` tags.
 
 ### 1. Define the Layout
 
@@ -41,41 +39,43 @@ Use the `ts-layout` ID. Use `{{ title }}` for the page title and `{{ content }}`
 
 ### 2. Define the Routes
 
-Use the `ts-routes` ID. Each child template needs a `path` and an optional `title`.
+Use the `ts-routes` ID. Use `{{ param }}` to inject URL variables directly into your HTML and Scripts.
 
 ```html
 <template-switch>
   <template id="ts-layout">
-    <nav>
-      <a href="/">Home</a>
-      <a href="/counter">Counter</a>
-    </nav>
-    <main>
-      <h1>Currently viewing: {{ title }}</h1>
-      <hr>
-      {{ content }}
-    </main>
+    <header>
+      <nav>
+        <a href="/">Home</a>
+        <a href="/counter/1">Counter 1</a>
+        <a href="/counter/42">Counter 42</a>
+      </nav>
+      <h1>{{ title }}</h1>
+    </header>
+    <main>{{ content }}</main>
   </template>
 
   <template id="ts-routes">
     <template path="/" title="Welcome">
-      <p>This is the home page, loaded instantly.</p>
+      <p>Home page, loaded instantly.</p>
     </template>
 
-    <template path="/counter" title="Persistent Counter">
-      <p>Count: <strong id="val">0</strong></p>
-      <button id="inc">Increment</button>
+    <template path="/counter/:start" title="Counter">
+      <article>
+        <p>Count: <strong id="val-{{start}}">{{start}}</strong></p>
+        <button id="inc-{{start}}">Increment</button>
+      </article>
+
       <script>
-        // This runs once on load and stays active!
-        let count = 0;
-        const btn = document.getElementById('inc');
-        const display = document.getElementById('val');
-        btn.onclick = () => display.textContent = ++count;
+        (() => {
+          // Variables are hardcoded into the script on instantiation!
+          let count = parseInt("{{start}}");
+          const btn = document.getElementById('inc-{{start}}');
+          const display = document.getElementById('val-{{start}}');
+          
+          btn.onclick = () => display.textContent = ++count;
+        })();
       </script>
-    </template>
-
-    <template path="/hello/:name" title="Greeting">
-      <p>Hello, {{ name }}! This param was pulled from the URL.</p>
     </template>
   </template>
 </template-switch>
@@ -84,42 +84,45 @@ Use the `ts-routes` ID. Each child template needs a `path` and an optional `titl
 
 ----------
 
-## 🧠 How it Works
+## 🧠 How it Works: The "Instance Stack"
 
-Unlike traditional routers that fetch new content or wipe the `innerHTML`, **Template Switch** performs a "Dom Stack" maneuver:
+Unlike traditional routers that wipe the page clean, **Template Switch** manages a stack of unique instances:
 
-1.  **Initial Load:** It reads all your templates and creates hidden `<section>` tags for every route.
+1.  **The Blueprint:** It stores your `<template>` tags as blueprints.
     
-2.  **Navigation:** When the URL changes (via `popstate` or link clicks), it hides the current section and shows the one matching the new path.
+2.  **The Instance:** When you visit `/user/alice`, it clones the blueprint, interpolates the data (`{{name}}` → `alice`), and appends it to the DOM.
     
-3.  **Interpolation:** If a path contains a parameter (like `:name`), it replaces `{{ name }}` in that section's HTML before showing it.
+3.  **The Toggle:** When you visit `/user/bob`, it hides "alice" and creates a new "bob" instance.
+    
+4.  **The Memory:** If you go back to `/user/alice`, the router simply unhides the original instance. Any changes you made (like typing in an input) are still there.
     
 
 ----------
 
 ## 💡 Advanced Advice
 
+### Avoiding ID Collisions
+
+Since multiple instances (like `/counter/1` and `/counter/2`) live in the DOM simultaneously, `document.getElementById('btn')` will always find the **first** one created.
+
+**Solution:** Use the `{{param}}` syntax to give your IDs unique names, as shown in the usage example: `id="btn-{{start}}"`
+
 ### Scoped Scripting
 
-Since all routes exist in the same document, global variables can clash. It is recommended to wrap your route scripts in an **IIFE**:
+Always wrap your scripts in an **IIFE** (Immediately Invoked Function Expression). This prevents variables from leaking into the global scope and clashing with other routes.
 
-```html
+```javascript
 <script>
   (() => {
-    const privateVar = "I won't leak!";
-    console.log(privateVar);
+    const localData = "Safe and sound";
   })();
 </script>
 
 ```
 
-### 4.0.4 Handling
-
-If a user visits a URL that doesn't match any defined `path`, the component automatically displays a built-in 404 message. You can customize this by adding a template with `path="404"` inside your `ts-routes`.
-
 ----------
 
 ## 📜 License
 
-MIT © [rodezee](https://www.google.com/search?q=https://github.com/rodezee)
+MIT © [rodezee](https://github.com/rodezee/template-switch)
 

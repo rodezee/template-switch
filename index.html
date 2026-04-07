@@ -68,6 +68,10 @@
                 <td><a href="/profile/John/Doe">View Profile</a></td>
               </tr>
               <tr>
+                <td>Piere Lun</td>
+                <td><a href="/profile/Piere/Lun">View Profile</a></td>
+              </tr>
+              <tr>
                 <td>Jane Smith</td>
                 <td><a href="/hello/Jane">Say Hi</a></td>
               </tr>
@@ -76,24 +80,24 @@
         </template>
         <template path="/counter/:start" title="Counter">
           <article>
-            <header>Local Template State</header>
-            <p>Count: <strong id="count-display">0</strong></p>
-            <button id="inc-btn">Increment</button>
+            <header>Counter started at {{start}}</header>
+            <p>Count: <strong id="display-{{start}}">{{start}}</strong></p>
+            <button id="btn-{{start}}">Increment</button>
           </article>
 
           <script>
-            // Initialize global state if it doesn't exist
-            var count = 0;
-            
-            // Update the UI immediately on load
-            const display = document.getElementById('count-display');
-            const btn = document.getElementById('inc-btn');
-            display.textContent = count;
+            // Because we use unique IDs like 'btn-{{start}}', 
+            // multiple counters won't clash!
+            (function() {
+              let count = parseInt("{{start}}"); // Hardcoded magic!
+              const display = document.getElementById("display-{{start}}");
+              const btn = document.getElementById("btn-{{start}}");
 
-            btn.onclick = () => {
-              count++;
-              display.textContent = count;
-            };
+              btn.onclick = () => {
+                count++;
+                display.textContent = count;
+              };
+            })();
           </script>
         </template>
       </template>
@@ -106,7 +110,7 @@
               <li><a href="/">Home</a></li>
               <li><a href="/users">Users</a></li>
               <li><a href="/hello/Visitor">Say Hello</a></li>
-              <li><a href="/counter">Counter</a></li>
+              <li><a href="/counter/2">Counter</a></li>
               <li><a href="https://github.com/rodezee/template-switch">Github</a></li>
             </ul>
           </nav>

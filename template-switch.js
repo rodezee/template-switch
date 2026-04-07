@@ -1,134 +1,119 @@
 class TemplateSwitch extends HTMLElement {
   constructor() {
     super();
-    this.routes = [];
-    this._notFoundEl = null;
+    this.routeTemplates = [];
+    this.instances = {};
+    this._stack = null;
   }
 
   connectedCallback() {
-    // 1. Capture the templates before they are moved/cleared
     const layoutTmpl = this.querySelector('template#ts-layout');
     const routesTmpl = this.querySelector('template#ts-routes');
+    if (!layoutTmpl || !routesTmpl) return;
 
-    if (!layoutTmpl || !routesTmpl) {
-      console.error("TemplateSwitch: Missing ts-layout or ts-routes.");
-      return;
-    }
+    // 1. Hardcode the animations into the document head
+    this._injectStyles();
 
-    this.init(layoutTmpl, routesTmpl);
+    // 2. Build Layout
+    this.innerHTML = layoutTmpl.innerHTML
+      .replace('{{ title }}', '<span id="ts-title"></span>')
+      .replace('{{ content }}', '<div id="ts-view-stack"></div>');
+    
+    this._stack = this.querySelector('#ts-view-stack');
+
+    // 3. Store blueprints
+    const tmpls = routesTmpl.content.querySelectorAll('template[path]');
+    this.routeTemplates = Array.from(tmpls).map(t => ({
+      path: t.getAttribute('path'),
+      title: t.getAttribute('title'),
+      regex: this.pathToRegex(t.getAttribute('path')),
+      raw: t.innerHTML
+    }));
 
     window.addEventListener("popstate", () => this.updateVisibility());
-    this.addEventListener("click", (e) => this.handleLinkClick(e));
-
+    this.onclick = (e) => this.handleLink(e);
     this.updateVisibility();
   }
 
-  init(layoutTmpl, routesTmpl) {
-    // 1. Prepare Layout
-    // We use innerHTML here to easily replace the {{ title }} and {{ content }} strings
-    let layoutHtml = layoutTmpl.innerHTML;
-    layoutHtml = layoutHtml.replace('{{ title }}', '<span id="ts-title"></span>');
-    this.innerHTML = layoutHtml;
+  _injectStyles() {
+    const styleId = "ts-core-styles";
+    if (document.getElementById(styleId)) return;
 
-    // 2. Prepare Routes Stack
-    const container = document.createElement('div');
-    container.id = "ts-view-stack";
+    const style = document.createElement("style");
+    style.id = styleId;
+    style.textContent = `
+      #ts-view-stack > section {
+        animation: tsFadeIn 0.35s ease-out;
+      }
 
-    // Grab all nested templates inside the routes template
-    const routeTemplates = routesTmpl.content.querySelectorAll('template[path]');
+      @keyframes tsFadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
 
-    this.routes = Array.from(routeTemplates).map(tmpl => {
-      const path = tmpl.getAttribute('path');
-      const section = document.createElement('section');
-      section.setAttribute('data-path', path);
-      section.style.display = 'none';
-
-      // Use the clean cloneNode method you suggested
-      const content = tmpl.content.cloneNode(true);
-      section.appendChild(content);
-      container.appendChild(section);
-
-      return {
-        path,
-        element: section,
-        title: tmpl.getAttribute('title') || 'Page',
-        regex: this.pathToRegex(path),
-        // Keep raw HTML only for routes with placeholders
-        raw: tmpl.innerHTML.includes('{{') ? tmpl.innerHTML : null
-      };
-    });
-
-    // 3. Add Default 404
-    this._notFoundEl = document.createElement('section');
-    this._notFoundEl.style.display = 'none';
-    this._notFoundEl.innerHTML = `<article><h1>404</h1><p>Page not found.</p><a href="/">Home</a></article>`;
-    container.appendChild(this._notFoundEl);
-
-    // 4. Inject into Layout
-    const main = this.querySelector('main') || this;
-    // If the user didn't use a <main> tag, find where {{ content }} was placed
-    if (this.innerHTML.includes('{{ content }}')) {
-       this.innerHTML = this.innerHTML.replace('{{ content }}', '<div id="ts-placeholder"></div>');
-       this.querySelector('#ts-placeholder').replaceWith(container);
-    } else {
-       main.appendChild(container);
-    }
+      /* Optional: ensure sections don't clash before they are hidden */
+      #ts-view-stack {
+        display: grid;
+        grid-template-areas: "stack";
+      }
+      #ts-view-stack > section {
+        grid-area: stack;
+      }
+    `;
+    document.head.appendChild(style);
   }
 
-  handleLinkClick(e) {
+  handleLink(e) {
     const link = e.target.closest("a");
-    if (link && link.href) {
-      const url = new URL(link.href);
-      if (url.origin === window.location.origin) {
-        e.preventDefault();
-        if (window.location.pathname !== url.pathname) {
-          history.pushState(null, "", url.pathname);
-          this.updateVisibility();
-        }
+    if (link && link.href && new URL(link.href).origin === window.location.origin) {
+      e.preventDefault();
+      if (window.location.pathname !== new URL(link.href).pathname) {
+        history.pushState(null, "", new URL(link.href).pathname);
+        this.updateVisibility();
       }
     }
   }
 
   pathToRegex(path) {
-    const pattern = path.replace(/:(\w+)/g, '(?<$1>[^/]+)');
-    return new RegExp(`^${pattern}$`);
+    return new RegExp(`^${path.replace(/:(\w+)/g, '(?<$1>[^/]+)')}$`);
   }
 
   interpolate(str, params) {
-    return str.replace(/{{\s*(\w+)\s*}}/g, (original, key) => {
-      return Object.hasOwn(params, key) ? params[key] : original;
-    });
+    return str.replace(/{{\s*(\w+)\s*}}/g, (_, key) => params[key] || "");
   }
 
   updateVisibility() {
     const path = window.location.pathname;
-    let matchedRoute = null;
+    
+    Object.values(this.instances).forEach(el => el.style.display = 'none');
 
-    if (this._notFoundEl) this._notFoundEl.style.display = 'none';
+    if (this.instances[path]) {
+      this.instances[path].style.display = 'block';
+      document.title = this.instances[path].dataset.title;
+      const titleSpan = this.querySelector('#ts-title');
+      if (titleSpan) titleSpan.textContent = document.title;
+      return;
+    }
 
-    this.routes.forEach(route => {
+    const route = this.routeTemplates.find(r => path.match(r.regex));
+    if (route) {
       const match = path.match(route.regex);
-      if (match) {
-        matchedRoute = route;
-        route.element.style.display = 'block';
-        if (route.raw) {
-          route.element.innerHTML = this.interpolate(route.raw, match.groups || {});
-        }
-      } else {
-        route.element.style.display = 'none';
-      }
-    });
+      const section = document.createElement('section');
+      
+      section.innerHTML = this.interpolate(route.raw, match.groups || {});
+      section.dataset.title = route.title;
+      
+      this._stack.appendChild(section);
+      this.instances[path] = section;
 
-    const titleSpan = this.querySelector('#ts-title');
-    if (matchedRoute) {
-      document.title = matchedRoute.title;
-      if (titleSpan) titleSpan.textContent = matchedRoute.title;
-    } else {
-      document.title = "404 - Not Found";
-      if (titleSpan) titleSpan.textContent = "Error";
-      if (this._notFoundEl) this._notFoundEl.style.display = 'block';
+      section.querySelectorAll("script").forEach(oldScript => {
+        const newScript = document.createElement("script");
+        newScript.textContent = oldScript.textContent;
+        oldScript.replaceWith(newScript);
+      });
+
+      this.updateVisibility();
     }
   }
 }
-
 customElements.define("template-switch", TemplateSwitch);
