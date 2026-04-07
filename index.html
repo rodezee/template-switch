@@ -8,7 +8,6 @@
     <link rel="stylesheet" href="//unpkg.com/@picocss/pico">
     <script type="module" src="/template-switch.js"></script>
     <script src="//unpkg.com/alpinejs" defer></script>
-    <script src="https://cdn.jsdelivr.net/npm/reefjs@13/dist/reef.min.js"></script>
   </head>
   <body>
     <template-switch>
@@ -190,24 +189,98 @@
             }
           </script>
         </template>
-        <template path="/reef" title="ReefJS">
-          <div id="reef-app"></div>
-          <button onclick="data.greeting = 'Hi'">Greeting to "Hi"</button>
-          <button onclick="data.name = 'Universe'">Name to "Universe"</button>
+        <template path="/todojs" title="JS Tasks">
+          <article id="vanilla-app-container"></article>
+
           <script>
-            let {signal, component} = reef;
+            (() => {
+              // 1. Data Management
+              const STORAGE_KEY = 'vanilla-tasks-v2';
+              const save = (tasks) => localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
+              const load = () => JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
 
-            let data = signal({
-	            greeting: 'Hello',
-	            name: 'World'
-            });
+              // 2. Actions (Attached to window so HTML strings can call them)
+              window.vAdd = () => {
+                const input = document.querySelector('#v-input');
+                if (!input || !input.value.trim()) return;
+                
+                const tasks = load();
+                tasks.push({ text: input.value, completed: false });
+                save(tasks);
+                render();
+              };
 
-            function template () {
-	            let {greeting, name} = data;
-	            return `<p>${greeting}, ${name}!</p>`;
-            }
+              window.vToggle = (index) => {
+                const tasks = load();
+                tasks[index].completed = !tasks[index].completed;
+                save(tasks);
+                render();
+              };
 
-            component('#reef-app', template);
+              window.vDelete = (index) => {
+                const tasks = load();
+                tasks.splice(index, 1);
+                save(tasks);
+                render();
+              };
+
+              window.vClear = () => {
+                const tasks = load().filter(t => !t.completed);
+                save(tasks);
+                render();
+              };
+
+              // 3. The Render Engine
+              const render = () => {
+                const container = document.querySelector('#vanilla-app-container');
+                if (!container) return;
+
+                const tasks = load();
+                const remaining = tasks.filter(t => !t.completed).length;
+                const hasCompleted = tasks.some(t => t.completed);
+
+                container.innerHTML = `
+                  <header>
+                    <h3>Vanilla Todo List</h3>
+                    <div class="grid">
+                      <input type="text" id="v-input" placeholder="What needs doing?" 
+                             onkeyup="if(event.key === 'Enter') window.vAdd()">
+                      <button onclick="window.vAdd()">Add</button>
+                    </div>
+                  </header>
+
+                  <ul style="list-style: none; padding: 0;">
+                    ${tasks.map((t, i) => `
+                      <li style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                        <input type="checkbox" ${t.completed ? 'checked' : ''} onchange="window.vToggle(${i})">
+                        <span style="flex-grow: 1; ${t.completed ? 'text-decoration: line-through; opacity: 0.5' : ''}">
+                          ${t.text}
+                        </span>
+                        <button class="outline secondary" style="padding: 2px 10px; margin: 0;" onclick="window.vDelete(${i})">&times;</button>
+                      </li>
+                    `).join('')}
+                  </ul>
+
+                  ${tasks.length > 0 ? `
+                    <footer style="display: flex; justify-content: space-between; align-items: center; margin-top: 20px;">
+                      <small>${remaining} items left</small>
+                      ${hasCompleted ? `
+                        <button class="outline contrast" style="font-size: 0.7rem; padding: 2px 8px;" onclick="window.vClear()">
+                          Clear Completed
+                        </button>
+                      ` : ''}
+                    </footer>
+                  ` : '<p style="text-align: center; color: gray;">All caught up! 🎉</p>'}
+                `;
+                
+                // Auto-focus input after render if it was active
+                const input = document.querySelector('#v-input');
+                if (input) input.focus();
+              };
+
+              // Initial Boot
+              setTimeout(render, 50);
+            })();
           </script>
         </template>
       </template>
@@ -221,8 +294,8 @@
               <li><a href="/users">Users</a></li>
               <li><a href="/hello/Visitor">Say Hello</a></li>
               <li><a href="/counter/2">Counter</a></li>
-              <li><a href="/todo">Todo</a></li>
-              <li><a href="/reef">Reef</a></li>
+              <li><a href="/todo">TodoAlpine</a></li>
+              <li><a href="/todojs">TodoJS</a></li>
               <li><a href="https://github.com/rodezee/template-switch">Github</a></li>
             </ul>
           </nav>
