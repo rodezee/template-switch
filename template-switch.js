@@ -84,27 +84,37 @@ class TemplateSwitch extends HTMLElement {
 
   updateVisibility() {
     const path = window.location.pathname;
+    const titleSpan = this.querySelector('#ts-title');
     
+    // Hide all current instances
     Object.values(this.instances).forEach(el => el.style.display = 'none');
 
+    // 1. Show existing instance if available
     if (this.instances[path]) {
       this.instances[path].style.display = 'block';
       document.title = this.instances[path].dataset.title;
-      const titleSpan = this.querySelector('#ts-title');
       if (titleSpan) titleSpan.textContent = document.title;
       return;
     }
 
-    const route = this.routeTemplates.find(r => path.match(r.regex));
+    // 2. Find matching blueprint or fallback to 404
+    let route = this.routeTemplates.find(r => path.match(r.regex));
+    let is404 = false;
+
+    if (!route) {
+      route = this.routeTemplates.find(r => r.path === '404');
+      is404 = true;
+    }
+
     if (route) {
-      const match = path.match(route.regex);
+      const match = !is404 ? path.match(route.regex) : { groups: {} };
       const section = document.createElement('section');
       
       section.innerHTML = this.interpolate(route.raw, match.groups || {});
-      section.dataset.title = route.title;
+      section.dataset.title = route.title || (is404 ? "Not Found" : "Page");
       
       this._stack.appendChild(section);
-      this.instances[path] = section;
+      this.instances[path] = section; // Map this specific URL to the 404 instance
 
       section.querySelectorAll("script").forEach(oldScript => {
         const newScript = document.createElement("script");
@@ -113,6 +123,11 @@ class TemplateSwitch extends HTMLElement {
       });
 
       this.updateVisibility();
+    } else {
+      // 3. Absolute Fallback if no 404 template is defined
+      document.title = "404 - Not Found";
+      if (titleSpan) titleSpan.textContent = "Error";
+      this._stack.innerHTML += `<section><h1>404</h1><p>Page not found.</p><a href="/">Return Home</a></section>`;
     }
   }
 }
