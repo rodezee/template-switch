@@ -10,7 +10,7 @@ A tiny, zero-dependency, **Stateful SPA Router** for the modern web. Built for *
 The fastest way to use **Template Switch** is via the [esm.sh](https://esm.sh) CDN.
 
 ```html
-<script type="module" src="https://esm.sh/gh/rodezee/template-switch/template-switch.js"></script>
+<script type="module" src="https://esm.sh/gh/rodezee/template-switch"></script>
 
 ```
 
@@ -25,9 +25,14 @@ The fastest way to use **Template Switch** is via the [esm.sh](https://esm.sh) C
 -   **Built-in Transitions:** Smooth, hardcoded `fadeIn` animations for every page change—no extra CSS required.
     
 -   **Dynamic "Instance" Routing:** Navigating to `/user/1` and `/user/2` creates two distinct, persistent sections.
+
+-   **Supports URL Variables:** Turns `/hello/:name` into `%{ name }%` [example](https://template-switch.netlify.app/hello/YourName)
     
 -   **Zero Dependencies:** No React, no Vue, no build tools. Just standard Web Components.
-    
+
+-   **Plays Well With Small Frameworks:** Small Frameworks like PetiteVue and AlpineJS love this switch [todo-example](https://template-switch.netlify.app/todo-petite)
+
+
 
 ----------
 
@@ -35,11 +40,11 @@ The fastest way to use **Template Switch** is via the [esm.sh](https://esm.sh) C
 
 ### 1. Define the Layout
 
-Use the `ts-layout` ID. Use `{{ title }}` for the page title and `{{ content }}` where the routes should appear.
+Use the `ts-layout` ID. Use `%{ title }%` for the page title and `%{ content }%` where the routes should appear.
 
 ### 2. Define the Routes
 
-Use the `ts-routes` ID. Use `{{ param }}` to inject URL variables directly into your HTML and Scripts.
+Use the `ts-routes` ID. Use `%{ param }%` to inject URL variables directly into your HTML and Scripts.
 
 ```html
 <template-switch>
@@ -50,9 +55,9 @@ Use the `ts-routes` ID. Use `{{ param }}` to inject URL variables directly into 
         <a href="/counter/1">Counter 1</a>
         <a href="/counter/42">Counter 42</a>
       </nav>
-      <h1>{{ title }}</h1>
+      <h1>%{ title }%</h1>
     </header>
-    <main>{{ content }}</main>
+    <main>%{ content }%</main>
   </template>
 
   <template id="ts-routes">
@@ -62,16 +67,16 @@ Use the `ts-routes` ID. Use `{{ param }}` to inject URL variables directly into 
 
     <template path="/counter/:start" title="Counter">
       <article>
-        <p>Count: <strong id="val-{{start}}">{{start}}</strong></p>
-        <button id="inc-{{start}}">Increment</button>
+        <p>Count: <strong id="val-%{start}%">%{start}%</strong></p>
+        <button id="inc-%{start}%">Increment</button>
       </article>
 
       <script>
         (() => {
           // Variables are hardcoded into the script on instantiation!
-          let count = parseInt("{{start}}");
-          const btn = document.getElementById('inc-{{start}}');
-          const display = document.getElementById('val-{{start}}');
+          let count = parseInt("%{start}%");
+          const btn = document.getElementById('inc-%{start}%');
+          const display = document.getElementById('val-%{start}%');
           
           btn.onclick = () => display.textContent = ++count;
         })();
@@ -90,7 +95,7 @@ Unlike traditional routers that wipe the page clean, **Template Switch** manages
 
 1.  **The Blueprint:** It stores your `<template>` tags as blueprints.
     
-2.  **The Instance:** When you visit `/user/alice`, it clones the blueprint, interpolates the data (`{{name}}` → `alice`), and appends it to the DOM.
+2.  **The Instance:** When you visit `/user/alice`, it clones the blueprint, interpolates the data (`%{name}%` → `alice`), and appends it to the DOM.
     
 3.  **The Toggle:** When you visit `/user/bob`, it hides "alice" and creates a new "bob" instance.
     
@@ -105,7 +110,7 @@ Unlike traditional routers that wipe the page clean, **Template Switch** manages
 
 Since multiple instances (like `/counter/1` and `/counter/2`) live in the DOM simultaneously, `document.getElementById('btn')` will always find the **first** one created.
 
-**Solution:** Use the `{{param}}` syntax to give your IDs unique names, as shown in the usage example: `id="btn-{{start}}"`
+**Solution:** Use the `%{param}%` syntax to give your IDs unique names, as shown in the usage example: `id="btn-%{start}%"`
 
 ### Scoped Scripting
 
@@ -117,6 +122,29 @@ Always wrap your scripts in an **IIFE** (Immediately Invoked Function Expression
     const localData = "Safe and sound";
   })();
 </script>
+
+```
+
+----------
+
+## 🚀 Deployment
+
+Since this is a Single Page Application (SPA) using the `History API`, your web server must be configured to serve `index.html` for all requests that don't match a static file.
+
+### Example for Nginx:
+
+```nginx
+location / {
+    try_files $uri $uri/ /index.html;
+}
+
+```
+
+### Example for Netlify:
+Simply include a file in the root of your repository, named:
+_redirects
+```
+/*    index.html    200
 
 ```
 

@@ -11,17 +11,15 @@ class TemplateSwitch extends HTMLElement {
     const routesTmpl = this.querySelector('template#ts-routes');
     if (!layoutTmpl || !routesTmpl) return;
 
-    // 1. Hardcode the animations into the document head
     this._injectStyles();
 
-    // 2. Build Layout
+    // 1. Updated Layout substitution to use %{ }%
     this.innerHTML = layoutTmpl.innerHTML
-      .replace('{{ title }}', '<span id="ts-title"></span>')
-      .replace('{{ content }}', '<div id="ts-view-stack"></div>');
+      .replace(/%{\s*title\s*}%/g, '<span id="ts-title"></span>')
+      .replace(/%{\s*content\s*}%/g, '<div id="ts-view-stack"></div>');
     
     this._stack = this.querySelector('#ts-view-stack');
 
-    // 3. Store blueprints
     const tmpls = routesTmpl.content.querySelectorAll('template[path]');
     this.routeTemplates = Array.from(tmpls).map(t => ({
       path: t.getAttribute('path'),
@@ -45,13 +43,10 @@ class TemplateSwitch extends HTMLElement {
       #ts-view-stack > section {
         animation: tsFadeIn 0.35s ease-out;
       }
-
       @keyframes tsFadeIn {
         from { opacity: 0; transform: translateY(10px); }
         to { opacity: 1; transform: translateY(0); }
       }
-
-      /* Optional: ensure sections don't clash before they are hidden */
       #ts-view-stack {
         display: grid;
         grid-template-areas: "stack";
@@ -78,18 +73,17 @@ class TemplateSwitch extends HTMLElement {
     return new RegExp(`^${path.replace(/:(\w+)/g, '(?<$1>[^/]+)')}$`);
   }
 
+  // 2. Updated Regex to match %{ variable }%
   interpolate(str, params) {
-    return str.replace(/{{\s*(\w+)\s*}}/g, (_, key) => params[key] || "");
+    return str.replace(/%{\s*(\w+)\s*}%/g, (_, key) => params[key] || "");
   }
 
   updateVisibility() {
     const path = window.location.pathname;
     const titleSpan = this.querySelector('#ts-title');
     
-    // Hide all current instances
     Object.values(this.instances).forEach(el => el.style.display = 'none');
 
-    // 1. Show existing instance if available
     if (this.instances[path]) {
       this.instances[path].style.display = 'block';
       document.title = this.instances[path].dataset.title;
@@ -97,7 +91,6 @@ class TemplateSwitch extends HTMLElement {
       return;
     }
 
-    // 2. Find matching blueprint or fallback to 404
     let route = this.routeTemplates.find(r => path.match(r.regex));
     let is404 = false;
 
@@ -114,7 +107,7 @@ class TemplateSwitch extends HTMLElement {
       section.dataset.title = route.title || (is404 ? "Not Found" : "Page");
       
       this._stack.appendChild(section);
-      this.instances[path] = section; // Map this specific URL to the 404 instance
+      this.instances[path] = section;
 
       section.querySelectorAll("script").forEach(oldScript => {
         const newScript = document.createElement("script");
@@ -124,7 +117,6 @@ class TemplateSwitch extends HTMLElement {
 
       this.updateVisibility();
     } else {
-      // 3. Absolute Fallback if no 404 template is defined
       document.title = "404 - Not Found";
       if (titleSpan) titleSpan.textContent = "Error";
       this._stack.innerHTML += `<section><h1>404</h1><p>Page not found.</p><a href="/">Return Home</a></section>`;
