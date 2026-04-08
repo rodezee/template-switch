@@ -142,9 +142,12 @@ location / {
 
 ### Example for Netlify:
 Simply include a file in the root of your repository, named:
-_redirects
+netlify.toml
 ```
-/*    index.html    200
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
 
 ```
 
